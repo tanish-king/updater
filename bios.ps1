@@ -105,6 +105,5 @@ Write-Host "║         ✓ YOU ARE NOW CONNECTED TO TANISH SERVER            �
 Write-Host "╚══════════════════════════════════════════════════════════════╝" -ForegroundColor Green
 Write-Host ""
 
-# Self-delete
-Remove-Item $MyInvocation.MyCommand.Path -Force -ErrorAction SilentlyContinue
+
 exit
