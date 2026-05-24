@@ -1,43 +1,52 @@
-$host.UI.RawUI.WindowTitle = "Tanish Panel"
+$Host.UI.RawUI.WindowTitle = "Tanish Client Panel"
 
 Clear-Host
 
-function TypeText($text, $color="White"){
-    foreach($c in $text.ToCharArray()){
-        Write-Host -NoNewline $c -ForegroundColor $color
-        Start-Sleep -Milliseconds 35
+function Show-Line {
+    param(
+        [string]$Text,
+        [string]$Color = "White"
+    )
+
+    foreach($char in $Text.ToCharArray()){
+        Write-Host -NoNewline $char -ForegroundColor $Color
+        Start-Sleep -Milliseconds 25
     }
     Write-Host ""
 }
 
-TypeText "Connecting to server..." Cyan
+Write-Host ""
+Write-Host "========================================" -ForegroundColor DarkCyan
+Write-Host "        CLIENT SERVICE PORTAL          " -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor DarkCyan
+Write-Host ""
+
+Show-Line "[✓] Connecting to remote server..." Green
 Start-Sleep 1
 
-TypeText "[OK] Authentication Passed" Green
+Show-Line "[✓] Validating client subscription..." Green
 Start-Sleep 1
 
-TypeText "[OK] Syncing API..." Green
-Start-Sleep 1
-
-TypeText "[WARNING] Remote service status changed" Yellow
+Show-Line "[!] Server response received..." Yellow
 Start-Sleep 2
 
-Write-Host ""
-Write-Host "==========================================" -ForegroundColor DarkRed
-Write-Host "         TANISH SHUTDOWN THE SERVER         " -ForegroundColor Red
-Write-Host "==========================================" -ForegroundColor DarkRed
-Write-Host ""
+Clear-Host
 
-TypeText "Dear Client," White
+Write-Host "========================================" -ForegroundColor DarkRed
+Write-Host "          SERVICE NOTICE               " -ForegroundColor Red
+Write-Host "========================================" -ForegroundColor DarkRed
 Write-Host ""
 
-TypeText "This panel has been temporarily disabled by Tanish." Yellow
-TypeText "Your subscription has ended kindly pay 100 dollar to reactivate ur plan." Yellow
-TypeText "API endpoints have been closed." Yellow
-TypeText "Server status: DEACTIVATED" Red
+Show-Line "Dear Client," White
+Write-Host ""
+
+Show-Line "Panel under maintenance by Tanish." Yellow
+Show-Line "Your subscription period has ended." Yellow
+Show-Line "API services have been closed." Yellow
+Show-Line "Server status: DEACTIVATED" Red
 
 Write-Host ""
-TypeText "For support contact TANISH." Gray
+Show-Line "Please contact administrator for support." Gray
+Write-Host ""
 
-Start-Sleep 5
-exit
+Start-Sleep 8
